@@ -2,59 +2,64 @@ import { useState } from "react";
 import { ethers } from "ethers";
 import abi from "./abis/SimpleSwap.json";
 
-const CONTRACT_ADDRESS = "0x342Cac67789e7dCD349B7c3Ba64476d656A16372"; // ← poné tu dirección de contrato real
+// 🔁 Reemplazá estas direcciones por las reales
+const SIMPLESWAP_ADDRESS = "0x342Cac67789e7dCD349B7c3Ba64476d656A16372";
+const TOKEN_A_ADDRESS = "0x37B5706A91465a44C728D32d4A53e808D56f2fF7";
+const TOKEN_B_ADDRESS = "0x4e92ee90964d7A2096b607f78aE9c5d1F2f4E1D9";
 
 function App() {
-  const [walletConnected, setWalletConnected] = useState(false);
-  const [price, setPrice] = useState(null);
-  const [contract, setContract] = useState(null);
+  const [account, setAccount] = useState(null);
+  const [price, setPrice] = useState("");
 
+  // 👉 Conectar wallet (MetaMask)
   const connectWallet = async () => {
-    try {
-      if (!window.ethereum) {
-        alert("Please install MetaMask");
-        return;
-      }
-
-      await window.ethereum.request({ method: "eth_requestAccounts" });
+    if (window.ethereum) {
       const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      const swap = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
-      setContract(swap);
-      setWalletConnected(true);
-    } catch (error) {
-      console.error("Wallet connection error:", error);
+      const accounts = await provider.send("eth_requestAccounts", []);
+      setAccount(accounts[0]);
+    } else {
+      alert("Please install MetaMask");
     }
   };
 
+  // 👉 Obtener precio A/B desde el contrato
   const handleGetPrice = async () => {
-    if (!contract) {
-      alert("Connect your wallet first.");
-      return;
-    }
-
     try {
-      const amountIn = ethers.parseUnits("1", 18);
-      const amountOut = await contract.getAmountOut(amountIn, true);
-      const formatted = ethers.formatUnits(amountOut, 18);
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+
+      const contract = new ethers.Contract(
+        SIMPLESWAP_ADDRESS,
+        SimpleSwapABI,
+        signer
+      );
+
+      const rawPrice = await contract.getPrice(TOKEN_A_ADDRESS, TOKEN_B_ADDRESS);
+      const formatted = ethers.formatUnits(rawPrice, 18);
+
       setPrice(formatted);
-    } catch (error) {
-      console.error("Error getting price:", error);
+    } catch (err) {
+      console.error("Error getting price:", err);
       alert("Error getting price. Check console.");
     }
   };
 
   return (
-    <div style={{ padding: "2rem", fontFamily: "Arial, sans-serif" }}>
+    <div style={{ padding: "2rem", fontFamily: "Arial" }}>
       <h1>SimpleSwap</h1>
 
-      {!walletConnected ? (
-        <button onClick={connectWallet}>Connect Wallet</button>
-      ) : (
-        <>
-          <button onClick={handleGetPrice}>See Price (1 A → B)</button>
-          {price && <p>Estimated Output: {price} tokens B</p>}
-        </>
+      <button onClick={connectWallet}>
+        {account ? `Connected: ${account.slice(0, 6)}...` : "Connect Wallet"}
+      </button>
+
+      <br /><br />
+
+      <button onClick={handleGetPrice}>Ver precios</button>
+
+      {price && (
+        <p>
+          Precio de Token A en B: <strong>{price}</strong>
+        </p>
       )}
     </div>
   );
