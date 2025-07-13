@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ethers } from "ethers";
-import abi from "./abis/SimpleSwap.json";
+import SimpleSwap from "./abis/SimpleSwap.json";
 
 // 🔁 Reemplazá estas direcciones por las reales
 const SIMPLESWAP_ADDRESS = "0x342Cac67789e7dCD349B7c3Ba64476d656A16372";
