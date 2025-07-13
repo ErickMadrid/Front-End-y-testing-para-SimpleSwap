@@ -1,12 +1,7 @@
 import { useEffect, useState } from "react";
 import { ethers } from "ethers";
-import abi from "./abis/SimpleSwap.json";
-
-// ABI mínimo para el token ERC20 (balanceOf, approve)
-const ERC20ABI = [
-  "function balanceOf(address) view returns (uint256)",
-  "function approve(address spender, uint256 amount) returns (bool)"
-];
+import abi from "./abis/SimpleSwap.json";      // ABI SimpleSwap
+import erc20Abi from "./abis/ERC20.json";      // ABI ERC20 estándar
 
 const CONTRACT_ADDRESS = "0xb56269DBebA415CC6e4A69BaAC1A830D18e4d584"; // <- Cambia por tu contrato
 const TOKEN_A_ADDRESS = "0xc0695774A49DB5374d20f1bCA3745bb362d25913"; // <- Cambia por tu TokenA
@@ -19,79 +14,85 @@ function App() {
   const [amountIn, setAmountIn] = useState("");
   const [price, setPrice] = useState("");
   const [tokenIn, setTokenIn] = useState("A");
+  const [loading, setLoading] = useState(false);
 
-  // Inicializar provider al montar componente
   useEffect(() => {
     if (window.ethereum) {
       const prov = new ethers.BrowserProvider(window.ethereum);
       setProvider(prov);
+    } else {
+      alert("Please install MetaMask!");
     }
   }, []);
 
-  // Función conectar wallet y crear instancia contrato
   const connectWallet = async () => {
     try {
+      if (!window.ethereum) throw new Error("MetaMask not installed");
       const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
       setWallet(accounts[0]);
+
       const signer = await provider.getSigner();
       const c = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
       setContract(c);
     } catch (err) {
       console.error("Wallet connection error:", err);
-      alert("Failed to connect wallet");
+      alert("Error connecting wallet");
     }
   };
 
-  // Obtener precio
   const handleGetPrice = async () => {
     if (!contract) return alert("Connect wallet first");
     try {
+      setLoading(true);
       const base = tokenIn === "A" ? TOKEN_A_ADDRESS : TOKEN_B_ADDRESS;
       const quote = tokenIn === "A" ? TOKEN_B_ADDRESS : TOKEN_A_ADDRESS;
-      const priceBN = await contract.getPrice(base, quote);
-      setPrice(ethers.formatUnits(priceBN, 18));
+      const rawPrice = await contract.getPrice(base, quote);
+      setPrice(ethers.formatUnits(rawPrice, 18));
     } catch (err) {
       console.error("Error getting price:", err);
       alert("Error getting price. Check console.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Función para hacer swap con chequeo de saldo y approve
   const handleSwap = async () => {
     if (!contract) return alert("Connect wallet first");
     if (!amountIn || isNaN(amountIn) || Number(amountIn) <= 0) return alert("Enter valid amount");
 
     try {
+      setLoading(true);
       const signer = await provider.getSigner();
 
-      // Determinar tokenIn y tokenOut
       const tokenInAddress = tokenIn === "A" ? TOKEN_A_ADDRESS : TOKEN_B_ADDRESS;
       const tokenOutAddress = tokenIn === "A" ? TOKEN_B_ADDRESS : TOKEN_A_ADDRESS;
 
-      // Instanciar tokenIn contrato ERC20 para balance y approve
-      const tokenContract = new ethers.Contract(tokenInAddress, ERC20ABI, signer);
+      // Contrato tokenIn para aprobar
+      const tokenContract = new ethers.Contract(tokenInAddress, erc20Abi, signer);
+      const amountParsed = ethers.parseUnits(amountIn, 18);
 
-      // Obtener balance y convertir amountIn a BigNumber
+      // Ver saldo disponible antes
       const balance = await tokenContract.balanceOf(wallet);
-      const amountBN = ethers.parseUnits(amountIn, 18);
-
-      // Validar saldo suficiente
-      if (balance.lt(amountBN)) {
+      if (balance.lt(amountParsed)) {
         alert("Insufficient token balance");
+        setLoading(false);
         return;
       }
 
-      // Approve
-      const approveTx = await tokenContract.approve(CONTRACT_ADDRESS, amountBN);
-      await approveTx.wait();
+      // Approve para que SimpleSwap pueda gastar los tokens
+      const allowance = await tokenContract.allowance(wallet, CONTRACT_ADDRESS);
+      if (allowance.lt(amountParsed)) {
+        const approveTx = await tokenContract.approve(CONTRACT_ADDRESS, amountParsed);
+        await approveTx.wait();
+      }
 
-      // Deadline 10 minutos desde ahora
+      // Deadline 10 min desde ahora
       const deadline = Math.floor(Date.now() / 1000) + 60 * 10;
 
       // Ejecutar swap
       const swapTx = await contract.swapExactTokensForTokens(
-        amountBN,
-        0, // amountOutMin, puedes mejorar esto
+        amountParsed,
+        0, // amountOutMin = 0 para simplificar, ideal poner slippage control
         tokenInAddress,
         tokenOutAddress,
         wallet,
@@ -103,6 +104,8 @@ function App() {
     } catch (err) {
       console.error("Swap failed:", err);
       alert("Swap failed. Check console.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -113,6 +116,7 @@ function App() {
       <button
         className="bg-blue-600 text-white px-4 py-2 rounded-lg mb-4"
         onClick={connectWallet}
+        disabled={!!wallet}
       >
         {wallet ? `Connected: ${wallet.slice(0, 6)}...` : "Connect Wallet"}
       </button>
@@ -123,6 +127,7 @@ function App() {
           value={tokenIn}
           onChange={(e) => setTokenIn(e.target.value)}
           className="mb-4 p-2 border rounded w-full"
+          disabled={!wallet}
         >
           <option value="A">Token A</option>
           <option value="B">Token B</option>
@@ -135,13 +140,15 @@ function App() {
           onChange={(e) => setAmountIn(e.target.value)}
           placeholder="Enter amount"
           className="mb-4 p-2 border rounded w-full"
+          disabled={!wallet}
         />
 
         <button
           className="bg-green-600 text-white px-4 py-2 rounded-lg w-full mb-2"
           onClick={handleGetPrice}
+          disabled={!wallet || loading}
         >
-          Get Price
+          {loading ? "Loading..." : "Get Price"}
         </button>
 
         {price && (
@@ -153,8 +160,9 @@ function App() {
         <button
           className="bg-purple-600 text-white px-4 py-2 rounded-lg w-full"
           onClick={handleSwap}
+          disabled={!wallet || loading}
         >
-          Swap Tokens
+          {loading ? "Processing..." : "Swap Tokens"}
         </button>
       </div>
     </div>
@@ -162,3 +170,4 @@ function App() {
 }
 
 export default App;
+
