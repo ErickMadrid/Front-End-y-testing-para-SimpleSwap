@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ethers } from "ethers";
-import SimpleSwap from "./abis/SimpleSwap.json";
+import SimpleSwapABI from "./abi/SimpleSwap.json";
 
 // 🔁 Reemplazá estas direcciones por las reales
 const SIMPLESWAP_ADDRESS = "0x342Cac67789e7dCD349B7c3Ba64476d656A16372";
@@ -8,58 +8,60 @@ const TOKEN_A_ADDRESS = "0x37B5706A91465a44C728D32d4A53e808D56f2fF7";
 const TOKEN_B_ADDRESS = "0x4e92ee90964d7A2096b607f78aE9c5d1F2f4E1D9";
 
 function App() {
-  const [account, setAccount] = useState(null);
-  const [price, setPrice] = useState("");
+  const [walletAddress, setWalletAddress] = useState(null);
+  const [provider, setProvider] = useState(null);
+  const [price, setPrice] = useState(null);
 
-  // 👉 Conectar wallet (MetaMask)
+  // Conectar Wallet
   const connectWallet = async () => {
     if (window.ethereum) {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const accounts = await provider.send("eth_requestAccounts", []);
-      setAccount(accounts[0]);
+      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+      setWalletAddress(accounts[0]);
+      const web3Provider = new ethers.BrowserProvider(window.ethereum);
+      setProvider(web3Provider);
     } else {
-      alert("Please install MetaMask");
+      alert("MetaMask not found");
     }
   };
 
-  // 👉 Obtener precio A/B desde el contrato
-  const handleGetPrice = async () => {
+  // Obtener precio
+  const getPrice = async () => {
     try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
+      if (!provider) {
+        alert("Please connect your wallet first");
+        return;
+      }
+
       const signer = await provider.getSigner();
+      const contract = new ethers.Contract(SIMPLESWAP_ADDRESS, SimpleSwapABI, signer);
 
-      const contract = new ethers.Contract(
-        SIMPLESWAP_ADDRESS,
-        SimpleSwapABI,
-        signer
-      );
+      const tokenA = await contract.tokenA();
+      const tokenB = await contract.tokenB();
+      const result = await contract.getPrice(tokenA, tokenB);
 
-      const rawPrice = await contract.getPrice(TOKEN_A_ADDRESS, TOKEN_B_ADDRESS);
-      const formatted = ethers.formatUnits(rawPrice, 18);
-
-      setPrice(formatted);
-    } catch (err) {
-      console.error("Error getting price:", err);
+      setPrice(ethers.formatUnits(result, 18));
+    } catch (error) {
+      console.error("Error getting price:", error);
       alert("Error getting price. Check console.");
     }
   };
 
   return (
     <div style={{ padding: "2rem", fontFamily: "Arial" }}>
-      <h1>SimpleSwap</h1>
+      <h1>🦑 SimpleSwap DApp</h1>
 
       <button onClick={connectWallet}>
-        {account ? `Connected: ${account.slice(0, 6)}...` : "Connect Wallet"}
+        {walletAddress ? `Connected: ${walletAddress.slice(0, 6)}...` : "Connect Wallet"}
       </button>
 
       <br /><br />
 
-      <button onClick={handleGetPrice}>Ver precios</button>
+      <button onClick={getPrice}>Get Token A → B Price</button>
 
       {price && (
-        <p>
-          Precio de Token A en B: <strong>{price}</strong>
-        </p>
+        <div style={{ marginTop: "1rem" }}>
+          <strong>Price:</strong> {price}
+        </div>
       )}
     </div>
   );
