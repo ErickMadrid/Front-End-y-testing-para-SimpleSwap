@@ -30,7 +30,7 @@ function App() {
       }
 
       const signer = await provider.getSigner();
-      const contract = new ethers.Contract(SIMPLESWAP_ADDRESS, SimpleSwapABI, signer);
+      const contract = new ethers.Contract(SIMPLESWAP_ADDRESS,abi, signer);
 
       const tokenA = await contract.tokenA();
       const tokenB = await contract.tokenB();
