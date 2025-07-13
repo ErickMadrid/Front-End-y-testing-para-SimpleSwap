@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { ethers } from "ethers";
-import SimpleSwapABI from "./abis/SimpleSwap.json";
-import ERC20ABI from "./abis/ERC20.json";
+import abi from "./abis/SimpleSwap.json";
+import ERC20ABI from "./abis/ERC20.json"; // ABI ERC20 estándar para balance, approve, allowance
 
-const CONTRACT_ADDRESS = "0xb56269DBebA415CC6e4A69BaAC1A830D18e4d584"; // Reemplaza con la dirección real
-const TOKEN_A_ADDRESS = "0xc0695774A49DB5374d20f1bCA3745bb362d25913"; // Reemplaza con la dirección de TokenA
-const TOKEN_B_ADDRESS = "0xbE71E2de751a68928D7BfF5B92f2cb10a51F4ea9"; // Reemplaza con la dirección de TokenB
+const CONTRACT_ADDRESS = "0xb56269DBebA415CC6e4A69BaAC1A830D18e4d584"; // Pon aquí tu contrato SimpleSwap
+const TOKEN_A_ADDRESS = "0xc0695774A49DB5374d20f1bCA3745bb362d25913";       // Dirección Token A
+const TOKEN_B_ADDRESS = "0xbE71E2de751a68928D7BfF5B92f2cb10a51F4ea9";       // Dirección Token B
 
 function App() {
   const [wallet, setWallet] = useState(null);
@@ -19,34 +19,29 @@ function App() {
     if (window.ethereum) {
       const prov = new ethers.BrowserProvider(window.ethereum);
       setProvider(prov);
-    } else {
-      alert("Please install MetaMask!");
     }
   }, []);
 
   const connectWallet = async () => {
-    if (!window.ethereum) return alert("Please install MetaMask!");
-
     try {
       const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
       setWallet(accounts[0]);
       const signer = await provider.getSigner();
-      const c = new ethers.Contract(CONTRACT_ADDRESS, SimpleSwapABI, signer);
+      const c = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
       setContract(c);
     } catch (err) {
       console.error("Wallet connection error:", err);
-      alert("Failed to connect wallet.");
+      alert("Failed to connect wallet");
     }
   };
 
   const handleGetPrice = async () => {
     if (!contract) return alert("Connect wallet first");
-
     try {
       const base = tokenIn === "A" ? TOKEN_A_ADDRESS : TOKEN_B_ADDRESS;
       const quote = tokenIn === "A" ? TOKEN_B_ADDRESS : TOKEN_A_ADDRESS;
-      const priceBigNumber = await contract.getPrice(base, quote);
-      setPrice(ethers.formatUnits(priceBigNumber, 18));
+      const price = await contract.getPrice(base, quote);
+      setPrice(ethers.formatUnits(price, 18));
     } catch (err) {
       console.error("Error getting price:", err);
       alert("Error getting price. Check console.");
@@ -54,25 +49,41 @@ function App() {
   };
 
   const handleSwap = async () => {
-    if (!contract) return alert("Connect wallet first");
-    if (!amountIn || isNaN(amountIn) || Number(amountIn) <= 0) return alert("Enter a valid amount");
+    if (!contract || !amountIn || !wallet) return alert("Connect wallet and enter amount");
 
     try {
       const signer = await provider.getSigner();
       const amountParsed = ethers.parseUnits(amountIn, 18);
+
       const tokenInAddress = tokenIn === "A" ? TOKEN_A_ADDRESS : TOKEN_B_ADDRESS;
       const tokenOutAddress = tokenIn === "A" ? TOKEN_B_ADDRESS : TOKEN_A_ADDRESS;
 
-      // Aprobar tokens antes de hacer swap
+      // Instanciar contrato tokenIn para balance y allowance
       const tokenContract = new ethers.Contract(tokenInAddress, ERC20ABI, signer);
-      const approveTx = await tokenContract.approve(CONTRACT_ADDRESS, amountParsed);
-      await approveTx.wait();
 
-      const deadline = Math.floor(Date.now() / 1000) + 60 * 10; // 10 minutos desde ahora
+      // Obtener saldo y allowance
+      const balance = await tokenContract.balanceOf(wallet);
+      const allowance = await tokenContract.allowance(wallet, CONTRACT_ADDRESS);
+
+      console.log("Balance:", ethers.formatUnits(balance, 18));
+      console.log("Allowance:", ethers.formatUnits(allowance, 18));
+
+      if (balance.lt(amountParsed)) {
+        alert("Insufficient token balance");
+        return;
+      }
+
+      // Si allowance es menor que amountParsed, aprobar primero
+      if (allowance.lt(amountParsed)) {
+        const approveTx = await tokenContract.approve(CONTRACT_ADDRESS, amountParsed);
+        await approveTx.wait();
+      }
+
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 10; // +10 min
 
       const swapTx = await contract.swapExactTokensForTokens(
         amountParsed,
-        0, // amountOutMin: mínimo aceptable (0 para simplificar)
+        0, // amountOutMin 0 para simplificar, en real usar slippage control
         tokenInAddress,
         tokenOutAddress,
         wallet,
@@ -143,5 +154,8 @@ function App() {
     </div>
   );
 }
+
+export default App;
+
 
 export default App;
