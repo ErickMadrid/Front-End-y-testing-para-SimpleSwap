@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ethers } from "ethers";
 import abi from "./utils/SimpleSwapABI.json";
 
-const CONTRACT_ADDRESS = "0xTU_CONTRATO"; // ← poné la dirección de tu contrato
+const CONTRACT_ADDRESS = "0x342Cac67789e7dCD349B7c3Ba64476d656A16372"; // ← poné tu dirección de contrato real
 
 function App() {
   const [walletConnected, setWalletConnected] = useState(false);
@@ -37,4 +37,27 @@ function App() {
       const amountIn = ethers.parseUnits("1", 18);
       const amountOut = await contract.getAmountOut(amountIn, true);
       const formatted = ethers.formatUnits(amountOut, 18);
-      setPrice(form
+      setPrice(formatted);
+    } catch (error) {
+      console.error("Error getting price:", error);
+      alert("Error getting price. Check console.");
+    }
+  };
+
+  return (
+    <div style={{ padding: "2rem", fontFamily: "Arial, sans-serif" }}>
+      <h1>SimpleSwap</h1>
+
+      {!walletConnected ? (
+        <button onClick={connectWallet}>Connect Wallet</button>
+      ) : (
+        <>
+          <button onClick={handleGetPrice}>See Price (1 A → B)</button>
+          {price && <p>Estimated Output: {price} tokens B</p>}
+        </>
+      )}
+    </div>
+  );
+}
+
+export default App;
