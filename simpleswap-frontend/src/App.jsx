@@ -1,82 +1,85 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import abi from "./abis/SimpleSwap.json";
 
+const CONTRACT_ADDRESS = "0x342Cac67789e7dCD349B7c3Ba64476d656A16372"; // <-- reemplaza esto
+
 function App() {
+  const [provider, setProvider] = useState(null);
+  const [signer, setSigner] = useState(null);
   const [contract, setContract] = useState(null);
-  const [walletConnected, setWalletConnected] = useState(false);
-  const [price, setPrice] = useState("");
-  
-  // ⚠️ Reemplazá con las direcciones REALES de tus tokens y contrato
-  const contractAddress = "0x342Cac67789e7dCD349B7c3Ba64476d656A16372";
-  const tokenAAddress = "0x37B5706A91465a44C728D32d4A53e808D56f2fF7";
-  const tokenBAddress = "0x4e92ee90964d7A2096b607f78aE9c5d1F2f4E1D9";
+  const [account, setAccount] = useState(null);
+  const [price, setPrice] = useState(null);
 
-  // 🔌 Conectar la wallet
-  const connectWallet = async () => {
-    if (window.ethereum) {
-      try {
-        await window.ethereum.request({ method: "eth_requestAccounts" });
-        setWalletConnected(true);
+  useEffect(() => {
+    const init = async () => {
+      if (window.ethereum) {
+        const prov = new ethers.BrowserProvider(window.ethereum);
+        setProvider(prov);
+        const signer = await prov.getSigner();
+        setSigner(signer);
 
-        const provider = new ethers.BrowserProvider(window.ethereum);
-        const signer = await provider.getSigner();
-        const instance = new ethers.Contract(contractAddress, abi, signer);
-        setContract(instance);
-      } catch (error) {
-        console.error("Wallet connection error:", error);
+        const swapContract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
+        setContract(swapContract);
+
+        const accs = await prov.send("eth_requestAccounts", []);
+        setAccount(accs[0]);
+      } else {
+        alert("Please install MetaMask");
       }
-    } else {
-      alert("Please install MetaMask");
-    }
-  };
+    };
 
-  // 🧮 Chequear si hay liquidez
+    init();
+  }, []);
+
   const checkLiquidity = async () => {
     try {
       const liquidity = await contract.totalSupply();
-      return liquidity.gt(0);
+      return BigInt(liquidity) > 0n;
     } catch (err) {
       console.error("Error checking liquidity:", err);
       return false;
     }
   };
 
-  // 💱 Obtener precio
   const getPrice = async () => {
-    if (!contract) {
-      alert("Contract not loaded");
-      return;
-    }
-
     try {
+      if (!contract) return;
+
       const hasLiquidity = await checkLiquidity();
       if (!hasLiquidity) {
-        setPrice("No liquidity available");
+        alert("No liquidity in the pool yet");
         return;
       }
 
-      const result = await contract.getPrice(tokenAAddress, tokenBAddress);
-      const formatted = ethers.formatUnits(result, 18); // ajustá si tus tokens usan otro decimal
-      setPrice(`${formatted} Token B por 1 Token A`);
-    } catch (error) {
-      console.error("Error getting price:", error);
-      setPrice("Error getting price");
+      const tokenA = await contract.tokenA();
+      const tokenB = await contract.tokenB();
+
+      const price = await contract.getPrice(tokenA, tokenB);
+      setPrice(ethers.formatUnits(price, 18));
+    } catch (err) {
+      console.error("Error getting price:", err);
+      alert("Error getting price. Check console.");
     }
   };
 
   return (
-    <div style={{ padding: "2rem", fontFamily: "Arial" }}>
+    <div style={{ padding: "2rem", fontFamily: "sans-serif" }}>
       <h1>SimpleSwap DApp</h1>
 
-      {!walletConnected ? (
-        <button onClick={connectWallet}>Conectar Wallet</button>
-      ) : (
-        <>
-          <button onClick={getPrice}>Ver precios</button>
-          <p><strong>Precio:</strong> {price}</p>
-        </>
+      <button onClick={getPrice}>Get Price</button>
+
+      {price && (
+        <p>
+          💱 Current Price: <strong>{price}</strong>
+        </p>
       )}
+
+      <p>
+        {account
+          ? `✅ Connected: ${account}`
+          : "❌ Wallet not connected"}
+      </p>
     </div>
   );
 }
