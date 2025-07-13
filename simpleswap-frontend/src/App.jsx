@@ -1,68 +1,84 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { ethers } from "ethers";
 import abi from "./abis/SimpleSwap.json";
 
-const SIMPLESWAP_ADDRESS = "0x342Cac67789e7dCD349B7c3Ba64476d656A16372"; // 🟡 Reemplaza por la dirección real del contrato desplegado
-
 function App() {
-  const [walletAddress, setWalletAddress] = useState(null);
-  const [provider, setProvider] = useState(null);
-  const [price, setPrice] = useState(null);
+  const [contract, setContract] = useState(null);
+  const [walletConnected, setWalletConnected] = useState(false);
+  const [price, setPrice] = useState("");
+  
+  // ⚠️ Reemplazá con las direcciones REALES de tus tokens y contrato
+  const contractAddress = "0x342Cac67789e7dCD349B7c3Ba64476d656A16372";
+  const tokenAAddress = "0x37B5706A91465a44C728D32d4A53e808D56f2fF7";
+  const tokenBAddress = "0x4e92ee90964d7A2096b607f78aE9c5d1F2f4E1D9";
 
-  // Conectar Wallet
+  // 🔌 Conectar la wallet
   const connectWallet = async () => {
     if (window.ethereum) {
-      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-      setWalletAddress(accounts[0]);
-      const web3Provider = new ethers.BrowserProvider(window.ethereum);
-      setProvider(web3Provider);
+      try {
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+        setWalletConnected(true);
+
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+        const instance = new ethers.Contract(contractAddress, abi, signer);
+        setContract(instance);
+      } catch (error) {
+        console.error("Wallet connection error:", error);
+      }
     } else {
-      alert("MetaMask not found");
+      alert("Please install MetaMask");
     }
   };
 
-  // Obtener precio
-  const getPrice = async () => {
+  // 🧮 Chequear si hay liquidez
+  const checkLiquidity = async () => {
     try {
-      if (!provider) {
-        alert("Please connect your wallet first");
+      const liquidity = await contract.totalSupply();
+      return liquidity.gt(0);
+    } catch (err) {
+      console.error("Error checking liquidity:", err);
+      return false;
+    }
+  };
+
+  // 💱 Obtener precio
+  const getPrice = async () => {
+    if (!contract) {
+      alert("Contract not loaded");
+      return;
+    }
+
+    try {
+      const hasLiquidity = await checkLiquidity();
+      if (!hasLiquidity) {
+        setPrice("No liquidity available");
         return;
       }
 
-      const signer = await provider.getSigner();
-      const contract = new ethers.Contract(SIMPLESWAP_ADDRESS,abi, signer);
-
-      const tokenA = await contract.tokenA();
-      const tokenB = await contract.tokenB();
-      const result = await contract.getPrice(tokenA, tokenB);
-
-      setPrice(ethers.formatUnits(result, 18));
+      const result = await contract.getPrice(tokenAAddress, tokenBAddress);
+      const formatted = ethers.formatUnits(result, 18); // ajustá si tus tokens usan otro decimal
+      setPrice(`${formatted} Token B por 1 Token A`);
     } catch (error) {
       console.error("Error getting price:", error);
-      alert("Error getting price. Check console.");
+      setPrice("Error getting price");
     }
   };
 
   return (
     <div style={{ padding: "2rem", fontFamily: "Arial" }}>
-      <h1>🦑 SimpleSwap DApp</h1>
+      <h1>SimpleSwap DApp</h1>
 
-      <button onClick={connectWallet}>
-        {walletAddress ? `Connected: ${walletAddress.slice(0, 6)}...` : "Connect Wallet"}
-      </button>
-
-      <br /><br />
-
-      <button onClick={getPrice}>Get Token A → B Price</button>
-
-      {price && (
-        <div style={{ marginTop: "1rem" }}>
-          <strong>Price:</strong> {price}
-        </div>
+      {!walletConnected ? (
+        <button onClick={connectWallet}>Conectar Wallet</button>
+      ) : (
+        <>
+          <button onClick={getPrice}>Ver precios</button>
+          <p><strong>Precio:</strong> {price}</p>
+        </>
       )}
     </div>
   );
 }
 
 export default App;
-
