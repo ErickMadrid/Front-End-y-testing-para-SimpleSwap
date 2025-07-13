@@ -1,11 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import SimpleSwapABI from "./abi/SimpleSwap.json";
 
-// 🔁 Reemplazá estas direcciones por las reales
-const SIMPLESWAP_ADDRESS = "0x342Cac67789e7dCD349B7c3Ba64476d656A16372";
-const TOKEN_A_ADDRESS = "0x37B5706A91465a44C728D32d4A53e808D56f2fF7";
-const TOKEN_B_ADDRESS = "0x4e92ee90964d7A2096b607f78aE9c5d1F2f4E1D9";
+const SIMPLESWAP_ADDRESS = "0x342Cac67789e7dCD349B7c3Ba64476d656A16372"; // 🟡 Reemplaza por la dirección real del contrato desplegado
 
 function App() {
   const [walletAddress, setWalletAddress] = useState(null);
