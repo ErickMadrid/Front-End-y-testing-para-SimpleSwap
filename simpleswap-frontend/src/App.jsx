@@ -3,9 +3,9 @@ import { ethers } from "ethers";
 import SimpleSwapABI from "./abis/SimpleSwap.json";
 import ERC20ABI from "./abis/ERC20.json";
 
-const CONTRACT_ADDRESS = "0xb56269DBebA415CC6e4A69BaAC1A830D18e4d584";
-const TOKEN_A_ADDRESS = "0xc0695774A49DB5374d20f1bCA3745bb362d25913"; 
-const TOKEN_B_ADDRESS = "0xbE71E2de751a68928D7BfF5B92f2cb10a51F4ea9"; 
+const CONTRACT_ADDRESS = "0x7E28Bd2020A958bc0B303b69929eF2f2eB67E1bc";
+const TOKEN_A_ADDRESS = "0x028c67473753E72B1248d464836b59fFEd3b40c7"; 
+const TOKEN_B_ADDRESS = "0x9D5c8747Cd60c0BE80B702C68fb86231cc093d7e"; 
 
 function App() {
   const [wallet, setWallet] = useState(null);
