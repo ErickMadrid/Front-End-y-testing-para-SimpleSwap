@@ -1,47 +1,61 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ethers } from "ethers";
-import SimpleSwapABI from "./abis/SimpleSwap.json"; // agregarás este ABI luego
+import abi from "./utils/SimpleSwapABI.json"; // Asegurate de que este archivo exista
 
-const App = () => {
-  const [account, setAccount] = useState(null);
+const CONTRACT_ADDRESS = "0xTU_CONTRATO"; // ⬅️ Reemplaza con tu dirección real
+
+function App() {
+  const [walletConnected, setWalletConnected] = useState(false);
   const [provider, setProvider] = useState(null);
   const [contract, setContract] = useState(null);
+  const [price, setPrice] = useState(null);
 
-  useEffect(() => {
-    const init = async () => {
-      if (window.ethereum) {
-        const _provider = new ethers.providers.Web3Provider(window.ethereum);
-        setProvider(_provider);
+  const connectWallet = async () => {
+    if (window.ethereum) {
+      const newProvider = new ethers.BrowserProvider(window.ethereum);
+      const signer = await newProvider.getSigner();
+      const swapContract = new ethers.Contract(CONTRACT_ADDRESS, abi, signer);
 
-        const signer = _provider.getSigner();
-        const _account = await _provider.send("eth_requestAccounts", []);
-        setAccount(_account[0]);
+      setProvider(newProvider);
+      setContract(swapContract);
+      setWalletConnected(true);
+    } else {
+      alert("Please install MetaMask");
+    }
+  };
 
-        const simpleSwap = new ethers.Contract(
-          import.meta.env.VITE_SIMPLESWAP_ADDRESS,
-          SimpleSwapABI,
-          signer
-        );
-        setContract(simpleSwap);
-      }
-    };
-    init();
-  }, []);
+  const handleGetPrice = async () => {
+    if (!contract) {
+      alert("Please connect your wallet first.");
+      return;
+    }
 
-  const getPrice = async () => {
-    const price = await contract.getPrice();
-    alert(`Precio: ${price}`);
+    try {
+      const amountIn = ethers.parseUnits("1", 18); // 1 Token A
+      const amountOut = await contract.getAmountOut(amountIn, true); // true = A to B
+      setPrice(ethers.formatUnits(amountOut, 18));
+    } catch (error) {
+      console.error("Error getting price:", error);
+      alert("Error fetching price. Check the console.");
+    }
   };
 
   return (
-    <div>
-      <h1>SimpleSwap DApp</h1>
-      <p>Conectado como: {account}</p>
-      <button onClick={getPrice}>Ver precio</button>
-      {/* Agrega luego más botones para swap A → B, B → A */}
+    <div style={{ padding: "2rem" }}>
+      <h1>SimpleSwap Interface</h1>
+
+      {!walletConnected && (
+        <button onClick={connectWallet}>Connect Wallet</button>
+      )}
+
+      {walletConnected && (
+        <>
+          <button onClick={handleGetPrice}>See Price 1 A → B</button>
+          {price && <p>Estimated Output: {price} Token B</p>}
+        </>
+      )}
     </div>
   );
-};
+}
 
 export default App;
-
