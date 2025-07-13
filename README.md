@@ -11,7 +11,7 @@ Project that implements a simple DEX (like Uniswap) which allows users to add/re
 `  
 
 ## 🚀 Front-end
-- [View on Vercel]([https://simpleswap.vercel.app](https://front-end-y-testing-para-simple-swa.vercel.app/))
+- [View on Vercel](https://front-end-y-testing-para-simple-swa.vercel.app/)
 
 Features:
 - Connect wallet (MetaMask)
