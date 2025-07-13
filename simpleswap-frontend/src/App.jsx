@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import abi from "./abis/SimpleSwap.json";
+import erc20ABI from "./abis/ERC20.json";
 
 const CONTRACT_ADDRESS = "0xb56269DBebA415CC6e4A69BaAC1A830D18e4d584"; // ← Reemplazar con la dirección real
 const TOKEN_A_ADDRESS = "0xc0695774A49DB5374d20f1bCA3745bb362d25913"; // ← Reemplazar con TokenA
@@ -54,8 +55,9 @@ function App() {
       const tokenInAddress = tokenIn === "A" ? TOKEN_A_ADDRESS : TOKEN_B_ADDRESS;
       const tokenOutAddress = tokenIn === "A" ? TOKEN_B_ADDRESS : TOKEN_A_ADDRESS;
 
-      // Approve antes del swap
-      const tokenContract = new ethers.Contract(tokenInAddress, abi, signer);
+      // ✅ ABI correcto para el token
+      const tokenContract = new ethers.Contract(tokenInAddress, erc20ABI, signer);
+
       const approveTx = await tokenContract.approve(CONTRACT_ADDRESS, amount);
       await approveTx.wait();
 
